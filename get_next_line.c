@@ -12,52 +12,51 @@
 
 #include "get_next_line.h"
 #include "libft/libft.h"
+#include <fcntl.h>
+#include <stdio.h>
 
-char	*check_dwrstring(char *dwrstring, char **line)
+char	*check_d_wr_string(char **p_n, char *d_wr_string)
 {
-	char *p2_line_feed;
+	char *str;
 
-	p2_line_feed = NULL;
-	if (dwrstring)
-		if ((p2_line_feed = ft_strchr(dwrstring, '\n')))
-		{
-			*p2_line_feed = '\0';
-			*line = ft_strdup(dwrstring);
-			ft_strcpy(dwrstring, ++p2_line_feed);
-		}
-		else
-		{
-			*line = ft_strdup(dwrstring);
-			ft_strclr(dwrstring);
-		}
+	if ((*p_n = ft_strchr(d_wr_string, '\n')) != NULL)
+	{
+		str = ft_strsub(d_wr_string, 0, *p_n - d_wr_string);
+		ft_strcpy(d_wr_string, ++(*p_n));
+	}
 	else
-		*line = ft_strnew(1);
-	return (p2_line_feed);
+	{
+		str = ft_strnew(ft_strlen(d_wr_string) + 1);
+		ft_strcat(str, d_wr_string);
+		ft_strclr(d_wr_string);
+	}
+	return (str);
 }
 
-int		get_line(const int fd, char **line, char **dwrstring)
+int		get_line(const int fd, char **line, char *d_wr_string)
 {
 	char		buf[BUFF_SIZE + 1];
 	int			b_w_r;
-	char		*p1_line_feed;
+	char		*p_n;
 	char		*tmp;
 
-	p1_line_feed = check_dwrstring(*dwrstring, line);
-	while (!p1_line_feed && (b_w_r = read(fd, buf, BUFF_SIZE)))
+	p_n = NULL;
+	b_w_r = 1;
+	*line = check_d_wr_string(&p_n, d_wr_string);
+	while (p_n == 0 && ((b_w_r = read(fd, buf, BUFF_SIZE)) != 0))
 	{
 		buf[b_w_r] = '\0';
-		if ((p1_line_feed = ft_strchr(buf, '\n')))
+		if ((p_n = ft_strchr(buf, '\n')) != NULL)
 		{
-			*p1_line_feed = '\0';
-			p1_line_feed++;
-			*dwrstring = ft_strdup(p1_line_feed);
+			ft_strcpy(d_wr_string, ++p_n);
+			ft_strclr(--p_n);
 		}
 		tmp = *line;
-		if (!(*line = ft_strjoin(*line, buf)) || b_w_r < 0)
+		if (!(*line = ft_strjoin(tmp, buf)) || b_w_r < 0)
 			return (-1);
 		ft_strdel(&tmp);
 	}
-	return (b_w_r || ft_strlen(*line)) ? 1 : 0;
+	return (b_w_r || ft_strlen(*line) || ft_strlen(d_wr_string)) ? 1 : 0;
 }
 
 t_list	*list_new_element(int fd)
@@ -67,7 +66,7 @@ t_list	*list_new_element(int fd)
 	if (!(new = (t_list *)malloc(sizeof(t_list))))
 		return (NULL);
 	new->fd = fd;
-	new->dwrstring = NULL;
+	new->dwrstring = ft_strnew(BUFF_SIZE);
 	new->next = NULL;
 	return (new);
 }
@@ -77,9 +76,9 @@ int		get_next_line(const int fd, char **line)
 	static t_list	*head;
 	t_list			*tmp;
 
-	if (fd < 0 || !line || BUFF_SIZE < 1)
+	if (fd < 0 || !line)
 		return (-1);
-	if (head == NULL)
+	if (!head)
 		head = list_new_element(fd);
 	tmp = head;
 	while (tmp->fd != fd)
@@ -88,5 +87,24 @@ int		get_next_line(const int fd, char **line)
 			tmp->next = list_new_element(fd);
 		tmp = tmp->next;
 	}
-	return (get_line(tmp->fd, line, &tmp->dwrstring));
+	return (get_line(fd, line, tmp->dwrstring));
+}
+
+int main(int ac, char **av)
+{
+	int ret;
+	int fd;
+	char *line;
+
+	ac = 1;
+	fd = open(av[ac], O_RDONLY);
+	ret = 1;
+	while (ret == 1)
+	{
+		ret = get_next_line(fd, &line);
+		printf("%d\n%s\n", ret, line);
+		ft_strdel(&line);
+	}
+	close(fd);
+	return (0);
 }
